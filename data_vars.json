@@ -5,6 +5,9 @@
     "inaugural_season": 1996,
     "misc_raw_table": "raw_FBref_mls_players_all_stats_misc",
     "misc_stg_table": "stg_FBref_mls_players_all_stats_misc",
+    "salary_raw_table": "raw_MLSPA_mls_players_salaries",
+    "salary_stg_table": "stg_MLSPA_mls_players_salaries",
+    "club_crosswalk_table": "dim_mls_club_crosswalk",
     "schmetzer_scores_tables": {
       "all": "schmetzer_scores_all",
       "season": "schmetzer_scores_YEAR"
@@ -15,6 +18,202 @@
       "misc_season_current": "https://FBref.com/en/comps/22/misc/Major-League-Soccer-Stats",
       "misc_season_specific": "https://FBref.com/en/comps/22/_YEAR_/misc/_YEAR_-Major-League-Soccer-Stats"
     }
+  },
+  "mlspa": {
+    "salary_guide_page": "https://mlsplayers.org/resources/salary-guide",
+    "salary_releases": {
+      "2018": {
+        "url": "https://s3.amazonaws.com/mlspa/2018-09-15-Salary-Information-Alphabetical.pdf",
+        "format": "pdf",
+        "release_label": "2018 Salary Information - as of September 15, 2018",
+        "name_order": "last_first"
+      },
+      "2019": {
+        "url": "https://s3.amazonaws.com/mlspa/Salary-List-Fall-Release-FINAL-Salary-List-Fall-Release-MLS.pdf",
+        "format": "pdf",
+        "release_label": "2019 Fall Salary List - as of September 13, 2019",
+        "name_order": "last_first"
+      },
+      "2020": {
+        "url": "https://s3.amazonaws.com/mlspa/2020-Fall-Winter-Salary-List-alphabetical.pdf",
+        "format": "pdf",
+        "release_label": "2020 Fall-Winter Salary List - as of December 1, 2020",
+        "name_order": "last_first"
+      },
+      "2021": {
+        "url": "https://s3.amazonaws.com/mlspa/2021-MLSPA-Fall-Salary-release.pdf",
+        "format": "pdf",
+        "release_label": "2021 Fall-Winter Salary List - as of September 30, 2021",
+        "name_order": "last_first"
+      },
+      "2022": {
+        "url": "https://s3.amazonaws.com/mlspa/2022-Fall-Salary-Guide.pdf",
+        "format": "pdf",
+        "release_label": "2022 Fall Salary Guide - as of September 2, 2022",
+        "name_order": "last_first"
+      },
+      "2023": {
+        "url": "https://s3.amazonaws.com/mlspa/2023-Salary-Report-as-of-Sept-15-2023.pdf",
+        "format": "pdf",
+        "release_label": "2023 Salary Report - as of September 15, 2023",
+        "name_order": "first_last"
+      },
+      "2024": {
+        "url": "https://s3.amazonaws.com/mlspa/Salary-Release-FALL-2024_241024_164547.csv",
+        "format": "csv",
+        "release_label": "2024 Fall Salary Release - as of October 24, 2024",
+        "column_map": {
+          "first_name": "fname",
+          "last_name": "lname",
+          "club": "club",
+          "position": "position",
+          "base_salary": "CY Base Salary",
+          "guaranteed_comp": "CY Guaranteed Comp"
+        }
+      },
+      "2025": {
+        "url": "https://s3.amazonaws.com/mlspa/MLS-Salary-List-10-2025-REVISED.csv",
+        "format": "csv",
+        "release_label": "2025 Fall Salary Guide - as of October 1, 2025",
+        "column_map": {
+          "first_name": "First Name",
+          "last_name": "Last Name",
+          "club": "Team Name",
+          "position": "Position",
+          "base_salary": "PA Base Salary",
+          "guaranteed_comp": "Guaranteed Comp"
+        }
+      },
+      "2026": {
+        "url": "https://s3.amazonaws.com/mlspa/Spring-2026-MLSPA-Salary-Guide.csv",
+        "format": "csv",
+        "release_label": "2026 Spring Salary Guide - as of April 16, 2026",
+        "column_map": {
+          "first_name": "First Name",
+          "last_name": "Last Name",
+          "club": "Club Name",
+          "position": "Position",
+          "base_salary": "PA Base Salary",
+          "guaranteed_comp": "CY Guaranteed Comp (PA)"
+        }
+      }
+    }
+  },
+  "salary": {
+    "value_metric_basis": "guaranteed_comp",
+    "value_per_dollars": 1000000,
+    "min_nineties_for_value_rank": 5
+  },
+  "mls_squad_names": [
+    "Atlanta United",
+    "Austin FC",
+    "CF Montreal",
+    "Charlotte FC",
+    "Chicago Fire FC",
+    "Colorado Rapids",
+    "Columbus Crew",
+    "DC United",
+    "FC Cincinnati",
+    "FC Dallas",
+    "Houston Dynamo",
+    "Inter Miami CF",
+    "LA Galaxy",
+    "Los Angeles FC",
+    "Minnesota United",
+    "Nashville SC",
+    "New England Revolution",
+    "New York City FC",
+    "New York Red Bulls",
+    "Orlando City SC",
+    "Philadelphia Union",
+    "Portland Timbers",
+    "Real Salt Lake",
+    "San Diego FC",
+    "San Jose Earthquakes",
+    "Seattle Sounders FC",
+    "Sporting Kansas City",
+    "St. Louis City SC",
+    "Toronto FC",
+    "Vancouver Whitecaps FC"
+  ],
+  "fbref_squad_aliases": {
+    "Atlanta Utd": "Atlanta United",
+    "Austin": "Austin FC",
+    "CF Montréal": "CF Montreal",
+    "Montreal Impact": "CF Montreal",
+    "Charlotte": "Charlotte FC",
+    "Chicago Fire": "Chicago Fire FC",
+    "Colorado Rapids": "Colorado Rapids",
+    "Columbus Crew": "Columbus Crew",
+    "D.C. United": "DC United",
+    "FC Cincinnati": "FC Cincinnati",
+    "FC Dallas": "FC Dallas",
+    "Houston Dynamo": "Houston Dynamo",
+    "Inter Miami": "Inter Miami CF",
+    "LA Galaxy": "LA Galaxy",
+    "LAFC": "Los Angeles FC",
+    "Minnesota Utd": "Minnesota United",
+    "Nashville SC": "Nashville SC",
+    "NE Revolution": "New England Revolution",
+    "NYCFC": "New York City FC",
+    "NY Red Bulls": "New York Red Bulls",
+    "Orlando City": "Orlando City SC",
+    "Philadelphia Union": "Philadelphia Union",
+    "Portland Timbers": "Portland Timbers",
+    "Real Salt Lake": "Real Salt Lake",
+    "San Diego FC": "San Diego FC",
+    "SJ Earthquakes": "San Jose Earthquakes",
+    "Seattle Sounders": "Seattle Sounders FC",
+    "Sporting KC": "Sporting Kansas City",
+    "St. Louis": "St. Louis City SC",
+    "Toronto FC": "Toronto FC",
+    "Vancouver W'caps": "Vancouver Whitecaps FC"
+  },
+  "mlspa_club_aliases": {
+    "Atlanta United": "Atlanta United",
+    "Austin FC": "Austin FC",
+    "CF Montreal": "CF Montreal",
+    "Montreal": "CF Montreal",
+    "Montreal Impact": "CF Montreal",
+    "Charlotte FC": "Charlotte FC",
+    "Chicago Fire": "Chicago Fire FC",
+    "Chicago Fire FC": "Chicago Fire FC",
+    "Colorado Rapids": "Colorado Rapids",
+    "Columbus Crew": "Columbus Crew",
+    "Columbus Crew SC": "Columbus Crew",
+    "DC United": "DC United",
+    "D.C. United": "DC United",
+    "FC Cincinnati": "FC Cincinnati",
+    "FC Dallas": "FC Dallas",
+    "Houston Dynamo": "Houston Dynamo",
+    "Houston Dynamo FC": "Houston Dynamo",
+    "Inter Miami": "Inter Miami CF",
+    "Inter Miami CF": "Inter Miami CF",
+    "LA Galaxy": "LA Galaxy",
+    "LAFC": "Los Angeles FC",
+    "Los Angeles FC": "Los Angeles FC",
+    "Minnesota United": "Minnesota United",
+    "Nashville SC": "Nashville SC",
+    "New England Revolution": "New England Revolution",
+    "New York City FC": "New York City FC",
+    "New York Red Bulls": "New York Red Bulls",
+    "Orlando City SC": "Orlando City SC",
+    "Orlando City": "Orlando City SC",
+    "Philadelphia Union": "Philadelphia Union",
+    "Portland Timbers": "Portland Timbers",
+    "Real Salt Lake": "Real Salt Lake",
+    "San Diego FC": "San Diego FC",
+    "San Jose Earthquakes": "San Jose Earthquakes",
+    "Seattle Sounders FC": "Seattle Sounders FC",
+    "Sporting Kansas City": "Sporting Kansas City",
+    "St. Louis City SC": "St. Louis City SC",
+    "Toronto FC": "Toronto FC",
+    "Vancouver Whitecaps": "Vancouver Whitecaps FC",
+    "Vancouver Whitecaps FC": "Vancouver Whitecaps FC",
+    "Major League Soccer": null,
+    "MLS Pool": null,
+    "Retired": null,
+    "Without a Club": null
   },
   "schmetzer_score_points": {
     "aerial duels won": {

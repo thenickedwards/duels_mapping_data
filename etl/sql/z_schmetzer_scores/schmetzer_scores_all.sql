@@ -24,7 +24,12 @@ INSERT INTO schmetzer_scores_all (
     interceptions,
     interceptions_pts,
     recoveries,
-    recoveries_pts
+    recoveries_pts,
+    base_salary,
+    guaranteed_comp,
+    salary_match_tier,
+    schmetzer_score_per_million,
+    schmetzer_value_rk
 )
 SELECT
     id,
@@ -50,5 +55,10 @@ SELECT
     interceptions,
     interceptions_pts,
     recoveries,
-    recoveries_pts
+    recoveries_pts,
+    base_salary,
+    guaranteed_comp,
+    salary_match_tier,
+    schmetzer_score_per_million,
+    schmetzer_value_rk
 FROM schmetzer_scores_{year};

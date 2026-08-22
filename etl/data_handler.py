@@ -12,8 +12,17 @@ from dependencies.normalize_data import find_none, normalize_none_to_null, norma
 script_dir = os.path.dirname(os.path.abspath(__file__))
 data_vars_path = os.path.join(script_dir, "..", "data_vars.json")
 data_vars_path = os.path.normpath(data_vars_path)
+sql_dir = os.path.join(script_dir, "sql")
 
 class DataHandler:
+    """ Base ETL orchestration class.
+
+    Everything every pipeline needs -- the data_vars configuration, the database
+    connection, running a SQL script, listing the season tables, and the upload to
+    Supabase -- lives here. Anything specific to one source belongs in a subclass
+    named for that source (see MLSPADataHandler in mlspa_data_handler.py), so a new
+    pipeline is a new subclass rather than another method on this class.
+    """
     def __init__(self, data_vars_path=data_vars_path):
         with open(data_vars_path, 'r') as f:
             data_vars = json.load(f)
@@ -31,6 +40,96 @@ class DataHandler:
             self.misc_season_specific  = data_vars["fbref"]["fbref_urls"]["misc_season_specific"]
             self.schmetzer_score = data_vars["schmetzer_score_points"]
             self.schmetzer_scores_tables = data_vars["database"]["schmetzer_scores_tables"] 
+            self.salary_raw_table = data_vars["database"]["salary_raw_table"]
+            self.salary_stg_table = data_vars["database"]["salary_stg_table"]
+            self.club_crosswalk_table = data_vars["database"]["club_crosswalk_table"]
+            self.mlspa = data_vars["mlspa"]
+            self.salary = data_vars["salary"]
+            self.mls_squad_names = data_vars["mls_squad_names"]
+            self.fbref_squad_aliases = data_vars["fbref_squad_aliases"]
+            self.mlspa_club_aliases = data_vars["mlspa_club_aliases"]
+
+    ##### Shared plumbing available to every pipeline #####
+
+    def connect(self):
+        """ Return a connection to the SQLite database named in data_vars.json. """
+        return connect_db(self.database_name, self.database_path)
+
+    def read_sql(self, *path_parts):
+        """ Take in path parts below etl/sql/, return the contents of that SQL file. """
+        with open(os.path.join(sql_dir, *path_parts), 'r') as f:
+            return f.read()
+
+    def create_table(self, table_name):
+        """ Take in a table name, run the matching script from etl/sql/create/.
+
+        create_tables() rebuilds the whole environment and drops every table with it.
+        This runs a single CREATE script instead, so a pipeline can stand up its own
+        tables without disturbing tables it does not own.
+        """
+        conn = self.connect()
+        c = conn.cursor()
+        try:
+            c.executescript(self.read_sql('create', f'{table_name}.sql'))
+            print(f'Created table: {table_name}')
+            conn.commit()
+        except sqlite3.Error as e:
+            print(e)
+        finally:
+            conn.close()
+
+    def standardize_squad_names(self):
+        """ Apply the club crosswalk to tables built before squad names were standardized.
+
+        Both staging loads standardize going forward. This corrects a database that
+        already holds the raw source spellings, in place rather than by rebuilding --
+        the FBref raw and staging tables can no longer be re-sourced. Idempotent.
+
+        Note the Schmetzer Score ids change with the squad slug they embed, so anything
+        holding a reference to them (Supabase rows, stg salary matches) needs refreshing
+        afterwards. See the README.
+        """
+        conn = self.connect()
+        c = conn.cursor()
+        try:
+            c.executescript(self.read_sql('migrate', 'standardize_squad_names_stg.sql'))
+            print(f'Standardized squad names in table: {self.stg_table}')
+            conn.commit()
+
+            sql_template = self.read_sql('migrate', 'standardize_squad_names_scores.sql')
+            tables = [f'schmetzer_scores_{season}' for season in self.get_schmetzer_season_tables(c)]
+            tables.append(self.schmetzer_scores_tables["all"])
+            for table in tables:
+                c.executescript(sql_template.format(table=table))
+                print(f'Standardized squad names in table: {table}')
+                conn.commit()
+        except sqlite3.Error as e:
+            print(e)
+        finally:
+            conn.close()
+
+    def report_squad_names(self):
+        """ Print the distinct squad names now in the Schmetzer Score tables. """
+        conn = self.connect()
+        c = conn.cursor()
+        try:
+            c.execute(f'SELECT squad, COUNT(*) FROM {self.schmetzer_scores_tables["all"]} '
+                      f'GROUP BY squad ORDER BY squad')
+            for squad, count in c.fetchall():
+                print(f'  {squad} ({count})')
+        except sqlite3.Error as e:
+            print(e)
+        finally:
+            conn.close()
+
+    def get_schmetzer_season_tables(self, cursor):
+        """ Take in a cursor, return the seasons that already have a schmetzer_scores_YYYY table. """
+        cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name LIKE 'schmetzer_scores_20__'
+            ORDER BY name;
+        """)
+        return [int(row[0][-4:]) for row in cursor.fetchall() if row[0][-4:].isdigit()]
 
     def create_tables(self):
         conn = connect_db(self.database_name, self.database_path)
@@ -183,7 +282,7 @@ class DataHandler:
         try: 
             for t in tables:
                 print(f"Extracting data from SQLite table: {t}")
-                c.execute(f"SELECT id, season, player_name, player_nationality, position, squad, player_age, player_yob, nineties, schmetzer_score, schmetzer_rk, aerial_duels_won, aerial_duels_lost, aerial_duels_total, aerial_duels_won_pct, tackles_won, interceptions, recoveries FROM {t}")
+                c.execute(f"SELECT id, season, player_name, player_nationality, position, squad, player_age, player_yob, nineties, schmetzer_score, schmetzer_rk, aerial_duels_won, aerial_duels_lost, aerial_duels_total, aerial_duels_won_pct, tackles_won, interceptions, recoveries, base_salary, guaranteed_comp, salary_match_tier, schmetzer_score_per_million, schmetzer_value_rk FROM {t}")
                 rows = c.fetchall()
                 # normalize data
                 data = [
