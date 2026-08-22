@@ -1,12 +1,8 @@
-import os
 from dotenv import load_dotenv
 load_dotenv()
 from mlspa_data_handler import MLSPADataHandler
 data_handler = MLSPADataHandler()
 
-# Supabase credentials
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 def pipeline_hist_MLSPA_salaries_to_schmetzer_scores_players():
     ### Create this pipeline's tables and add the salary columns to existing score tables
@@ -35,7 +31,7 @@ def pipeline_hist_MLSPA_salaries_to_schmetzer_scores_players():
     data_handler.report_salary_coverage()
 
     # Upload SQLite data to Supabase
-    data_handler.insert_SQLite_to_Supabase(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_ANON_KEY)
+    data_handler.insert_SQLite_to_Supabase()
 
 
 if __name__ == "__main__":
