@@ -10,11 +10,15 @@
 -- app serves -- only the record of the weights that produced it.
 --
 -- Safe to re-run, and self-healing: step 2 repairs a table that already exists without a
--- unique constraint on stat_name. That case is not hypothetical -- a table created through
--- the Supabase table editor gets its own surrogate primary key, leaving stat_name
--- unconstrained, and CREATE TABLE IF NOT EXISTS then silently does nothing. The sync fails
--- on that with 42P10 ("there is no unique or exclusion constraint matching the ON CONFLICT
--- specification"), because insert_SQLite_to_Supabase() upserts on stat_name.
+-- unique constraint on stat_name. That case is not hypothetical -- a table created outside
+-- this script can end up with no constraint on stat_name at all, and CREATE TABLE IF NOT
+-- EXISTS then silently does nothing. The sync fails on that with 42P10 ("there is no unique
+-- or exclusion constraint matching the ON CONFLICT specification"), because
+-- insert_SQLite_to_Supabase() upserts on stat_name.
+--
+-- Such a table is also unable to publish deletes to Supabase Realtime (error 55000, "does
+-- not have a replica identity and publishes deletes"), so step 2 handles its own replica
+-- identity rather than assuming one exists.
 
 -- stat_name: the statistic, matching the keys under schmetzer_score_points in data_vars.json
 -- point_value: what one occurrence of that statistic contributes to the Schmetzer Score
@@ -43,21 +47,36 @@ BEGIN
           AND array_length(c.conkey, 1) = 1
           AND a.attname = 'stat_name'
     ) THEN
-        -- A unique constraint cannot be added over duplicates or NULLs. The table is a
-        -- copy of SQLite truth that the next sync repopulates, so pruning here is safe.
-        DELETE FROM "dim_schmetzer_score_points" a
-        USING "dim_schmetzer_score_points" b
-        WHERE a.ctid < b.ctid
-          AND a.stat_name IS NOT DISTINCT FROM b.stat_name;
+        -- A unique constraint cannot be added over duplicates or NULLs, so any existing
+        -- rows are pruned first. The table is a copy of SQLite truth that the next sync
+        -- repopulates, so pruning is safe. Skipped entirely when the table is empty,
+        -- which is the common case.
+        IF EXISTS (SELECT 1 FROM "dim_schmetzer_score_points") THEN
+            -- Supabase Realtime publishes this table, and Postgres refuses to publish a
+            -- DELETE from a table with no replica identity -- precisely the state a table
+            -- without a primary key is in (error 55000). FULL is the only identity
+            -- available until the unique constraint below exists.
+            ALTER TABLE "dim_schmetzer_score_points" REPLICA IDENTITY FULL;
 
-        DELETE FROM "dim_schmetzer_score_points"
-        WHERE stat_name IS NULL;
+            DELETE FROM "dim_schmetzer_score_points" a
+            USING "dim_schmetzer_score_points" b
+            WHERE a.ctid < b.ctid
+              AND a.stat_name IS NOT DISTINCT FROM b.stat_name;
+
+            DELETE FROM "dim_schmetzer_score_points"
+            WHERE stat_name IS NULL;
+        END IF;
 
         ALTER TABLE "dim_schmetzer_score_points"
             ALTER COLUMN stat_name SET NOT NULL;
 
         ALTER TABLE "dim_schmetzer_score_points"
             ADD CONSTRAINT dim_schmetzer_score_points_stat_name_key UNIQUE (stat_name);
+
+        -- With a NOT NULL unique index in place the table can identify its own rows, so
+        -- replication no longer needs to carry every column to do it.
+        ALTER TABLE "dim_schmetzer_score_points"
+            REPLICA IDENTITY USING INDEX dim_schmetzer_score_points_stat_name_key;
     END IF;
 END
 $$;
