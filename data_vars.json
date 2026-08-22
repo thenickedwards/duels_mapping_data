@@ -8,6 +8,7 @@
     "salary_raw_table": "raw_MLSPA_mls_players_salaries",
     "salary_stg_table": "stg_MLSPA_mls_players_salaries",
     "club_crosswalk_table": "dim_mls_club_crosswalk",
+    "schmetzer_points_table": "dim_schmetzer_score_points",
     "schmetzer_scores_tables": {
       "all": "schmetzer_scores_all",
       "season": "schmetzer_scores_YEAR"
@@ -221,19 +222,19 @@
       "abbrev": "adw"
     },
     "aerial duels lost": {
-      "point_value": -0.75,
+      "point_value": -0.85,
       "abbrev": "adl"
     },
     "tackles won": {
-      "point_value": 1,
+      "point_value": 1.5,
       "abbrev": "tkwon"
     },
     "interceptions": {
-      "point_value": 0.75,
+      "point_value": 0.9,
       "abbrev": "inter"
     },
     "recoveries": {
-      "point_value": 0.5,
+      "point_value": 0.25,
       "abbrev": "recov"
     }
   }
