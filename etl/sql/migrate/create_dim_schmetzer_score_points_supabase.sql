@@ -81,8 +81,13 @@ BEGIN
 END
 $$;
 
--- 3. The app reads scores, not weights, so this table is reference data rather than a
---    served endpoint. Read-only to the anon key, matching the score tables.
+-- 3. Read-only to the anon key.
+--
+--    REQUIRES SUPABASE_SERVICE_ROLE_KEY in .env first. The sync writes this table, and
+--    with RLS on and no write policy the anon key is refused: 42501, "new row violates
+--    row-level security policy". The service role bypasses RLS, which is how the sync
+--    still writes while the public key cannot. See restrict_supabase_write_access.sql,
+--    which applies the same lockdown to the score tables.
 ALTER TABLE "dim_schmetzer_score_points" ENABLE ROW LEVEL SECURITY;
 
 DO $$

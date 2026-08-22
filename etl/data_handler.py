@@ -3,11 +3,16 @@ import glob
 import os
 import datetime
 import sqlite3
+from dotenv import load_dotenv
 from supabase import create_client, Client
 from supafunc.errors import FunctionsRelayError, FunctionsHttpError
 from dependencies.connect_db import connect_db
 from dependencies.get_from_fbref import get_FBref_mls_player_misc_stats
 from dependencies.normalize_data import find_none, normalize_none_to_null, normalize_row
+
+# Credentials are read from .env by resolve_supabase_write_credentials(). Loading here
+# too keeps DataHandler usable when imported directly, not only via a pipeline script.
+load_dotenv()
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 data_vars_path = os.path.join(script_dir, "..", "data_vars.json")
@@ -310,8 +315,34 @@ class DataHandler:
         supabase.table(table).upsert(data, default_to_null=True, on_conflict=on_conflict).execute()
         print(f'Inserted data into Supbase table: {table} ({len(data)} rows)')
 
-    def insert_SQLite_to_Supabase(self, supabase_url, supabase_key):
+    def resolve_supabase_write_credentials(self):
+        """ Return (url, key) for the sync, preferring the service role key.
+
+        The anon key is public -- it ships to every browser that loads the deployed app --
+        so a database the sync can write to with it is a database anyone can write to.
+        The service role key bypasses RLS, which lets the Supabase tables be genuinely
+        read-only to anon while this pipeline still writes.
+
+        Falls back to the anon key with a warning rather than failing, so a checkout
+        without SUPABASE_SERVICE_ROLE_KEY set keeps working against tables that still
+        allow anon writes. Once the RLS lockdown migration has been applied, that
+        fallback stops working, by design -- add the key to .env.
+        """
+        url = (os.getenv("SUPABASE_URL") or "").strip()
+        service_key = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+        if service_key:
+            return url, service_key
+
+        print("⚠️  SUPABASE_SERVICE_ROLE_KEY is not set -- falling back to SUPABASE_ANON_KEY.")
+        print("   The anon key is public, so this only works while the Supabase tables")
+        print("   accept anon writes. See the README on restricting write access.")
+        return url, (os.getenv("SUPABASE_ANON_KEY") or "").strip()
+
+    def insert_SQLite_to_Supabase(self, supabase_url=None, supabase_key=None):
         """ Push the tables the app serves, plus the weights behind them, to Supabase.
+
+        Credentials default to resolve_supabase_write_credentials(), so callers do not
+        each decide which key the sync writes with.
 
         The score tables go first and the dim table last on purpose. dim_schmetzer_score_points
         is not read by the app -- it is carried so the cloud copy records which weights
@@ -326,6 +357,10 @@ class DataHandler:
             self.schmetzer_scores_tables["season"].replace("YEAR", str(year)) for year in range(2018, 2026)
         ]
         # Supabase client
+        if supabase_url is None or supabase_key is None:
+            resolved_url, resolved_key = self.resolve_supabase_write_credentials()
+            supabase_url = supabase_url or resolved_url
+            supabase_key = supabase_key or resolved_key
         supabase: Client = create_client(supabase_url, supabase_key)
         # SQLite connection
         conn = connect_db(self.database_name, self.database_path)
