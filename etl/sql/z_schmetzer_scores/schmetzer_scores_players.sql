@@ -109,29 +109,34 @@ SELECT
     player_yob,
     nineties,
     interceptions,
-    interceptions * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'interceptions'),
+    ROUND(interceptions * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'interceptions'), 2),
     tackles_won,
-    tackles_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'tackles won'),
+    ROUND(tackles_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'tackles won'), 2),
     recoveries,
-    recoveries * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'recoveries'),
+    ROUND(recoveries * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'recoveries'), 2),
     aerial_duels_won,
-    aerial_duels_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels won'),
+    ROUND(aerial_duels_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels won'), 2),
     aerial_duels_lost,
-    aerial_duels_lost * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels lost'),
+    ROUND(aerial_duels_lost * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels lost'), 2),
     (aerial_duels_won + aerial_duels_lost), -- aerial_duels_total
-    (aerial_duels_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels won')) +
-    (aerial_duels_lost * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels lost')), -- aerial_duels_total_pts
+    ROUND(
+        (aerial_duels_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels won')) +
+        (aerial_duels_lost * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels lost'))
+    , 2), -- aerial_duels_total_pts
     CASE
         WHEN (aerial_duels_won + aerial_duels_lost) = 0 THEN 0
         ELSE ROUND(100.0 * aerial_duels_won / (aerial_duels_won + aerial_duels_lost), 1) -- aerial_duels_won_pct
     END AS aerial_duels_won_pct,
     -- Calculate Schmetzer score
-    (interceptions * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'interceptions')) +
-    (tackles_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'tackles won')) +
-    (recoveries * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'recoveries')) +
-    (aerial_duels_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels won')) +
-    (aerial_duels_lost * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels lost'))
-    AS schmetzer_score -- schmetzer_score
+    -- ROUND to 2dp: weights such as -0.85 and 0.9 have no exact binary float
+    -- representation, so the raw sum surfaces artifacts like 121.39999999999998.
+    ROUND(
+        (interceptions * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'interceptions')) +
+        (tackles_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'tackles won')) +
+        (recoveries * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'recoveries')) +
+        (aerial_duels_won * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels won')) +
+        (aerial_duels_lost * (SELECT point_value FROM dim_schmetzer_score_points WHERE stat_name = 'aerial duels lost'))
+    , 2) AS schmetzer_score -- schmetzer_score
 FROM squad_agg_by_nineties
 WHERE season = {year}
 ORDER BY schmetzer_score DESC;
