@@ -25,6 +25,11 @@ CREATE TABLE schmetzer_scores_all (
   interceptions_pts       REAL DEFAULT 0, 
   recoveries              INTEGER DEFAULT 0,
   recoveries_pts          REAL DEFAULT 0, 
+  base_salary                 REAL, -- MLSPA annual base salary in USD
+  guaranteed_comp             REAL, -- MLSPA annual average guaranteed compensation in USD
+  salary_match_tier           TEXT, -- Which rule joined this player to their salary record
+  schmetzer_score_per_million REAL, -- Schmetzer Score earned per $1M of guaranteed compensation
+  schmetzer_value_rk          INTEGER,
   load_datetime           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   -- , UNIQUE(player_name, player_yob, season, squad)
 );
@@ -37,3 +42,5 @@ CREATE INDEX IF NOT EXISTS idx_schmetzer_scores_all__player_season ON schmetzer_
 CREATE INDEX IF NOT EXISTS idx_schmetzer_scores_all__position ON schmetzer_scores_all (position);
 
 CREATE INDEX IF NOT EXISTS idx_schmetzer_scores_all__squad ON schmetzer_scores_all (squad);
+
+CREATE INDEX IF NOT EXISTS idx_schmetzer_scores_all__value ON schmetzer_scores_all (schmetzer_score_per_million);

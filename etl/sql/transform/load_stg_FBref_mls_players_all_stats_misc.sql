@@ -31,7 +31,10 @@ SELECT
     raw.player,
     raw.nation,
     raw.pos,
-    raw.squad,
+    -- Squad names are standardized here so every downstream table and the dashboard
+    -- itself show one spelling per club. COALESCE keeps an unrecognised squad rather
+    -- than nulling it, so a new or renamed club still lands and is visible.
+    COALESCE(crosswalk.squad, raw.squad) AS squad,
     raw.age,
     raw.born,
     raw.nineties,
@@ -58,6 +61,9 @@ SELECT
     END AS aerial_duels_won_pct,
     CURRENT_TIMESTAMP
 FROM raw_FBref_mls_players_all_stats_misc raw
+LEFT JOIN dim_mls_club_crosswalk crosswalk
+       ON crosswalk.club_alias = raw.squad
+      AND crosswalk.source = 'fbref'
 WHERE NOT EXISTS (
     SELECT 1
     FROM stg_FBref_mls_players_all_stats_misc stg
