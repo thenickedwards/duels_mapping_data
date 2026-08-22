@@ -43,6 +43,7 @@ class DataHandler:
             self.salary_raw_table = data_vars["database"]["salary_raw_table"]
             self.salary_stg_table = data_vars["database"]["salary_stg_table"]
             self.club_crosswalk_table = data_vars["database"]["club_crosswalk_table"]
+            self.schmetzer_points_table = data_vars["database"]["schmetzer_points_table"]
             self.mlspa = data_vars["mlspa"]
             self.salary = data_vars["salary"]
             self.mls_squad_names = data_vars["mls_squad_names"]
@@ -148,13 +149,22 @@ class DataHandler:
             conn.close()
             
     def insert_dim_schmetzer_score_points(self):
+        """ Load the weights from data_vars.json into the dim table.
+
+        Upserts on stat_name rather than plain INSERT, so retuning the weights is a
+        config edit plus this method -- the original INSERT could only run against a
+        table create_tables() had just dropped, and create_tables() also drops the
+        FBref tables, which can no longer be re-sourced.
+        """
         conn = connect_db(self.database_name, self.database_path)
         c = conn.cursor()
         try:
             for stat_name, stat_info in self.schmetzer_score.items():
                 point_value = stat_info["point_value"]
                 abbrev = stat_info["abbrev"]
-                c.execute("INSERT INTO dim_schmetzer_score_points VALUES (:stat_name, :point_value, :abbrev)", {'stat_name': stat_name, 'point_value': point_value, 'abbrev': abbrev})
+                c.execute("INSERT INTO dim_schmetzer_score_points VALUES (:stat_name, :point_value, :abbrev) "
+                          "ON CONFLICT(stat_name) DO UPDATE SET point_value = excluded.point_value, abbrev = excluded.abbrev",
+                          {'stat_name': stat_name, 'point_value': point_value, 'abbrev': abbrev})
                 conn.commit()
                 print(f'Inserted into table: dim_schmetzer_score_points {stat_name} with point_value: {point_value} and abbrev: {abbrev}')
         except sqlite3.Error as e:
@@ -217,12 +227,19 @@ class DataHandler:
         finally:
             conn.close()
     
-    def insert_schmetzer_scores_players(self):
+    def insert_schmetzer_scores_players(self, seasons=None):
+        """ Score and rank each season from the staging table.
+
+        Defaults to every season from the inaugural one through the current year.
+        Pass seasons to rescore only the ones already in the database -- retuning the
+        weights has to rebuild these tables, and the default range would otherwise
+        create an empty table for a season the dead FBref feed never delivered.
+        """
         conn = connect_db(self.database_name, self.database_path)
         c = conn.cursor()
         try:
             sql_file = glob.glob('app-duels-mapping/public/duels_mapping_data/etl/sql/z_schmetzer_scores/schmetzer_scores_players.sql')[0]
-            for year in range(2018, self.current_year + 1):            
+            for year in (seasons or range(2018, self.current_year + 1)):
                 with open(sql_file, 'r') as f:
                     table_name = f'schmetzer_scores_{year}'
                     sql = f.read()
@@ -266,7 +283,42 @@ class DataHandler:
             conn.close()
             
             
+    # Columns a Schmetzer Score table ships to Supabase. The per-stat _pts columns are
+    # deliberately absent: Supabase serves scores, it never recomputes them.
+    SUPABASE_SCORE_COLUMNS = (
+        "id, season, player_name, player_nationality, position, squad, player_age, "
+        "player_yob, nineties, schmetzer_score, schmetzer_rk, aerial_duels_won, "
+        "aerial_duels_lost, aerial_duels_total, aerial_duels_won_pct, tackles_won, "
+        "interceptions, recoveries, base_salary, guaranteed_comp, salary_match_tier, "
+        "schmetzer_score_per_million, schmetzer_value_rk"
+    )
+    SUPABASE_SCHMETZER_POINTS_COLUMNS = "stat_name, point_value, abbrev"
+
+    def _upsert_table_to_supabase(self, supabase, cursor, table, columns, on_conflict,
+                                  scored_rows_only=False):
+        """ Take a SQLite table, upsert its rows into the Supabase table of the same name.
+
+        scored_rows_only drops rows without an integer season, which the score tables
+        can carry and Postgres rejects; dim tables have no season column at all.
+        """
+        print(f"Extracting data from SQLite table: {table}")
+        cursor.execute(f"SELECT {columns} FROM {table}")
+        rows = cursor.fetchall()
+        if scored_rows_only:
+            rows = [r for r in rows if r['season'] is not None and isinstance(r['season'], int)]
+        data = [normalize_row(r) for r in rows]
+        supabase.table(table).upsert(data, default_to_null=True, on_conflict=on_conflict).execute()
+        print(f'Inserted data into Supbase table: {table} ({len(data)} rows)')
+
     def insert_SQLite_to_Supabase(self, supabase_url, supabase_key):
+        """ Push the tables the app serves, plus the weights behind them, to Supabase.
+
+        The score tables go first and the dim table last on purpose. dim_schmetzer_score_points
+        is not read by the app -- it is carried so the cloud copy records which weights
+        produced the scores sitting next to it -- so a Supabase side missing that table
+        must not block the upload the app actually depends on. It needs creating once,
+        via etl/sql/migrate/create_dim_schmetzer_score_points_supabase.sql.
+        """
         tables = [
             self.schmetzer_scores_tables["all"]] + [
             # self.schmetzer_scores_tables["season"].replace("YEAR", str(year)) for year in range(2018, self.current_year + 1)
@@ -279,18 +331,13 @@ class DataHandler:
         conn = connect_db(self.database_name, self.database_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        try: 
+        try:
             for t in tables:
-                print(f"Extracting data from SQLite table: {t}")
-                c.execute(f"SELECT id, season, player_name, player_nationality, position, squad, player_age, player_yob, nineties, schmetzer_score, schmetzer_rk, aerial_duels_won, aerial_duels_lost, aerial_duels_total, aerial_duels_won_pct, tackles_won, interceptions, recoveries, base_salary, guaranteed_comp, salary_match_tier, schmetzer_score_per_million, schmetzer_value_rk FROM {t}")
-                rows = c.fetchall()
-                # normalize data
-                data = [
-                    normalize_row(r) for r in rows
-                    if r['season'] is not None and isinstance(r['season'], int)
-                ]
-                response = supabase.table(t).upsert(data, default_to_null=True, on_conflict='id').execute()
-                print(f'Inserted data into Supbase table: {t}')
+                self._upsert_table_to_supabase(supabase, c, t, self.SUPABASE_SCORE_COLUMNS,
+                                               on_conflict='id', scored_rows_only=True)
+            self._upsert_table_to_supabase(supabase, c, self.schmetzer_points_table,
+                                           self.SUPABASE_SCHMETZER_POINTS_COLUMNS,
+                                           on_conflict='stat_name')
         except sqlite3.Error as e:
             print(e)
         except FunctionsHttpError as exception:
