@@ -28,7 +28,7 @@ class DataHandler:
     named for that source (see MLSPADataHandler in mlspa_data_handler.py), so a new
     pipeline is a new subclass rather than another method on this class.
     """
-    def __init__(self, data_vars_path=data_vars_path):
+    def __init__(self, data_vars_path=data_vars_path, clubs_cw_path=None):
         with open(data_vars_path, 'r') as f:
             data_vars = json.load(f)
             self.database_name = data_vars["database"]["name"]
@@ -51,9 +51,17 @@ class DataHandler:
             self.schmetzer_points_table = data_vars["database"]["schmetzer_points_table"]
             self.mlspa = data_vars["mlspa"]
             self.salary = data_vars["salary"]
-            self.mls_squad_names = data_vars["mls_squad_names"]
-            self.fbref_squad_aliases = data_vars["fbref_squad_aliases"]
-            self.mlspa_club_aliases = data_vars["mlspa_club_aliases"]
+
+        # The club crosswalk is reference data rather than configuration, so it has a
+        # file of its own beside data_vars.json. Defaults to that sibling so a custom
+        # data_vars_path keeps its own crosswalk.
+        if clubs_cw_path is None:
+            clubs_cw_path = os.path.join(os.path.dirname(data_vars_path), "data_vars_clubs_cw.json")
+        with open(clubs_cw_path, 'r', encoding='utf-8') as f:
+            clubs_cw = json.load(f)
+            self.mls_squad_names = clubs_cw["mls_squad_names"]
+            self.fbref_squad_aliases = clubs_cw["fbref_squad_aliases"]
+            self.mlspa_club_aliases = clubs_cw["mlspa_club_aliases"]
 
     ##### Shared plumbing available to every pipeline #####
 
