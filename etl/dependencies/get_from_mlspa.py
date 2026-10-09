@@ -13,7 +13,7 @@ Every release carries the same six facts -- first name, last name, club, positio
 annual base salary, and annual guaranteed compensation -- but the delivery format
 changed over time: 2024 onward is CSV, 2018-2023 is PDF. The headers of the CSVs
 drift year to year and the column order of the PDFs does too, so both readers are
-driven by the per-season entries in data_vars.json rather than by hardcoded layouts.
+driven by the per-season entries in dv_mlspa.json rather than by hardcoded layouts.
 '''
 
 # Column headers vary per release, so DataFrame columns are standardized here.
@@ -221,7 +221,7 @@ def read_mlspa_salary_pdf(content, club_names, name_order, verbose=1):
 
 def get_MLSPA_mls_player_salaries(season, release, club_names, verbose=1):
     '''
-    This function accepts a season, that season's release entry from data_vars.json,
+    This function accepts a season, that season's release entry from dv_mlspa.json,
     and the MLSPA club names to expect, downloads the release, and returns a
     DataFrame representation with string (or None) values.
     '''

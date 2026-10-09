@@ -1,6 +1,8 @@
+import json
+import os
 import sqlite3
 
-from data_handler import DataHandler
+from data_handler import DataHandler, data_vars_path as default_data_vars_path
 from dependencies.get_from_mlspa import get_MLSPA_mls_player_salaries
 from dependencies.match_players import match_players_to_salaries
 
@@ -15,7 +17,7 @@ SALARY_COLUMNS = [
 ]
 
 
-class MLSPADataHandler(DataHandler):
+class DH_MLSPA(DataHandler):
     """ ETL orchestration for the MLSPA salary guide.
 
     Salaries arrive one release per season from https://mlsplayers.org/resources/salary-guide
@@ -28,15 +30,23 @@ class MLSPADataHandler(DataHandler):
     has built those tables for the seasons in question.
     """
 
-    def __init__(self, data_vars_path=None):
+    def __init__(self, data_vars_path=None, mlspa_path=None):
         if data_vars_path is None:
             super().__init__()
+            data_vars_path = default_data_vars_path
         else:
             super().__init__(data_vars_path)
+
+        # The MLSPA releases are too source-specific to share data_vars.json, so they
+        # have a file of their own beside it, defaulting to that sibling.
+        if mlspa_path is None:
+            mlspa_path = os.path.join(os.path.dirname(data_vars_path), "dv_mlspa.json")
+        with open(mlspa_path, 'r', encoding='utf-8') as f:
+            self.mlspa = json.load(f)
         self.salary_releases = self.mlspa["salary_releases"]
 
     def get_salary_seasons(self):
-        """ Return the seasons data_vars.json has an MLSPA release configured for. """
+        """ Return the seasons dv_mlspa.json has an MLSPA release configured for. """
         return sorted(int(season) for season in self.salary_releases)
 
     ##### Setup #####

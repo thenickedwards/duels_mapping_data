@@ -1,14 +1,14 @@
 from dotenv import load_dotenv
 load_dotenv()
-from mlspa_data_handler import MLSPADataHandler
-data_handler = MLSPADataHandler()
+from dh_mlspa_salaries import DH_MLSPA
+data_handler = DH_MLSPA()
 
 
 def pipeline_cur_MLSPA_salaries_to_schmetzer_scores_players():
     ### Make sure the salary columns exist on any season table added since the last run
     data_handler.add_salary_columns_to_schmetzer_scores()
 
-    ### Refresh the crosswalk in case data_vars.json gained a club since the last run
+    ### Refresh the crosswalk in case dv_clubs_cw.json gained a club since the last run
     data_handler.insert_dim_mls_club_crosswalk()
 
     ### Insert into raw table
