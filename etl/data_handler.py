@@ -25,8 +25,8 @@ class DataHandler:
     Everything every pipeline needs -- the data_vars configuration, the database
     connection, running a SQL script, listing the season tables, and the upload to
     Supabase -- lives here. Anything specific to one source belongs in a subclass
-    named for that source (see MLSPADataHandler in mlspa_data_handler.py), so a new
-    pipeline is a new subclass rather than another method on this class.
+    named for that source and prefixed DH_ (see DH_MLSPA in dh_mlspa_salaries.py), so
+    a new pipeline is a new subclass rather than another method on this class.
     """
     def __init__(self, data_vars_path=data_vars_path, clubs_cw_path=None):
         with open(data_vars_path, 'r') as f:
@@ -49,14 +49,13 @@ class DataHandler:
             self.salary_stg_table = data_vars["database"]["salary_stg_table"]
             self.club_crosswalk_table = data_vars["database"]["club_crosswalk_table"]
             self.schmetzer_points_table = data_vars["database"]["schmetzer_points_table"]
-            self.mlspa = data_vars["mlspa"]
             self.salary = data_vars["salary"]
 
         # The club crosswalk is reference data rather than configuration, so it has a
         # file of its own beside data_vars.json. Defaults to that sibling so a custom
         # data_vars_path keeps its own crosswalk.
         if clubs_cw_path is None:
-            clubs_cw_path = os.path.join(os.path.dirname(data_vars_path), "data_vars_clubs_cw.json")
+            clubs_cw_path = os.path.join(os.path.dirname(data_vars_path), "dv_clubs_cw.json")
         with open(clubs_cw_path, 'r', encoding='utf-8') as f:
             clubs_cw = json.load(f)
             self.mls_squad_names = clubs_cw["mls_squad_names"]

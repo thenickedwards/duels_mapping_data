@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
-from mlspa_data_handler import MLSPADataHandler
-data_handler = MLSPADataHandler()
+from dh_mlspa_salaries import DH_MLSPA
+data_handler = DH_MLSPA()
 
 
 def pipeline_hist_MLSPA_salaries_to_schmetzer_scores_players():

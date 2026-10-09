@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS dim_mls_club_crosswalk;
 -- resolves any of those spellings to the one squad name the app displays, so a club
 -- reads the same whichever pipeline the row arrived through.
 --
--- Controlled by data_vars_clubs_cw.json: mls_squad_names lists the canonical names, and
+-- Controlled by dv_clubs_cw.json: mls_squad_names lists the canonical names, and
 -- fbref_squad_aliases / mlspa_club_aliases map each source's spellings onto them.
 -- A NULL squad marks an MLSPA bucket that is not a club (MLS Pool, Retired, etc).
 -- Keyed on (club_alias, source): the two feeds share some spellings while disagreeing
