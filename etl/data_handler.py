@@ -41,6 +41,7 @@ class DataHandler:
             self.current_year = datetime.datetime.now().year
             self.raw_table = data_vars["database"]["misc_raw_table"]
             self.stg_table = data_vars["database"]["misc_stg_table"]
+            self.stg_view = data_vars["database"]["misc_stg_view"]
             self.misc_season_current  = data_vars["fbref"]["fbref_urls"]["misc_season_current"]
             self.misc_season_specific  = data_vars["fbref"]["fbref_urls"]["misc_season_specific"]
             self.schmetzer_score = data_vars["schmetzer_score_points"]
@@ -61,6 +62,7 @@ class DataHandler:
             self.mls_squad_names = clubs_cw["mls_squad_names"]
             self.fbref_squad_aliases = clubs_cw["fbref_squad_aliases"]
             self.mlspa_club_aliases = clubs_cw["mlspa_club_aliases"]
+            self.whoscored_squad_aliases = clubs_cw["whoscored_squad_aliases"]
 
     ##### Shared plumbing available to every pipeline #####
 
@@ -85,6 +87,33 @@ class DataHandler:
         try:
             c.executescript(self.read_sql('create', f'{table_name}.sql'))
             print(f'Created table: {table_name}')
+            conn.commit()
+        except sqlite3.Error as e:
+            print(e)
+        finally:
+            conn.close()
+
+    def insert_dim_mls_club_crosswalk(self):
+        """ Load every source's club spellings into the crosswalk.
+
+        There is one crosswalk table and one canonical set of squad names, and every
+        feed resolves against it so a club reads identically wherever it came from.
+        It lives on the base because every pipeline refreshes it.
+        """
+        conn = self.connect()
+        c = conn.cursor()
+        try:
+            c.execute(f"DELETE FROM {self.club_crosswalk_table}")
+            for source, aliases in (('fbref', self.fbref_squad_aliases),
+                                    ('mlspa', self.mlspa_club_aliases),
+                                    ('whoscored', self.whoscored_squad_aliases)):
+                for club_alias, squad in aliases.items():
+                    c.execute(
+                        f"INSERT OR REPLACE INTO {self.club_crosswalk_table} "
+                        f"VALUES (:club_alias, :source, :squad)",
+                        {'club_alias': club_alias, 'source': source, 'squad': squad})
+                print(f'Inserted into table: {self.club_crosswalk_table} '
+                      f'{len(aliases)} {source} club spellings')
             conn.commit()
         except sqlite3.Error as e:
             print(e)
@@ -239,8 +268,30 @@ class DataHandler:
         finally:
             conn.close()
     
+    def refresh_stg_FBref_mls_players_all_stats_misc(self, season):
+        """ Rebuild one season of FBref staging from the raw table.
+
+        insert_stg_FBref_mls_players_all_stats_misc() only adds players staging has not
+        seen, so a season reloaded into raw never updates the totals already staged.
+        This replaces the season outright. Offline and safe to re-run: it reads the raw
+        table, which is left untouched.
+        """
+        conn = self.connect()
+        c = conn.cursor()
+        try:
+            c.executescript(self.read_sql('migrate', 'refresh_stg_FBref_mls_players_all_stats_misc.sql').format(year=season))
+            print(f'Refreshed table: {self.stg_table} for season {season} from table: {self.raw_table}')
+            conn.commit()
+        except sqlite3.Error as e:
+            print(e)
+        finally:
+            conn.close()
+
     def insert_schmetzer_scores_players(self, seasons=None):
-        """ Score and rank each season from the staging table.
+        """ Score and rank each season from the staging view.
+
+        The view (stg_mls_players_all_stats_misc) reads FBref for 2018-2025 and
+        WhoScored from 2026, so each season scores the same way whatever its source.
 
         Defaults to every season from the inaugural one through the current year.
         Pass seasons to rescore only the ones already in the database -- retuning the
@@ -257,7 +308,7 @@ class DataHandler:
                     sql = f.read()
                     sql = sql.format(year=year)
                     c.executescript(sql)
-                    print(f'Created table: {table_name} and inserted player data from table: {self.stg_table} for season {year}')
+                    print(f'Created table: {table_name} and inserted player data from view: {self.stg_view} for season {year}')
                     conn.commit()
         except sqlite3.Error as e:
             print(e)
@@ -302,7 +353,7 @@ class DataHandler:
         "player_yob, nineties, schmetzer_score, schmetzer_rk, aerial_duels_won, "
         "aerial_duels_lost, aerial_duels_total, aerial_duels_won_pct, tackles_won, "
         "interceptions, recoveries, base_salary, guaranteed_comp, salary_match_tier, "
-        "schmetzer_score_per_million, schmetzer_value_rk"
+        "schmetzer_value_rk"
     )
     SUPABASE_SCHMETZER_POINTS_COLUMNS = "stat_name, point_value, abbrev"
 
@@ -355,14 +406,8 @@ class DataHandler:
         is not read by the app -- it is carried so the cloud copy records which weights
         produced the scores sitting next to it -- so a Supabase side missing that table
         must not block the upload the app actually depends on. It needs creating once,
-        via etl/sql/migrate/create_dim_schmetzer_score_points_supabase.sql.
+        via etl/sql/z_supabase/create_dim_schmetzer_score_points_supabase.sql.
         """
-        tables = [
-            self.schmetzer_scores_tables["all"]] + [
-            # self.schmetzer_scores_tables["season"].replace("YEAR", str(year)) for year in range(2018, self.current_year + 1)
-            # REMOVED ABOVE bc of data source issue (only 2018 - 2025 data available)
-            self.schmetzer_scores_tables["season"].replace("YEAR", str(year)) for year in range(2018, 2026)
-        ]
         # Supabase client
         if supabase_url is None or supabase_key is None:
             resolved_url, resolved_key = self.resolve_supabase_write_credentials()
@@ -374,6 +419,10 @@ class DataHandler:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         try:
+            # Every season that has been scored, whichever source it came from
+            tables = [self.schmetzer_scores_tables["all"]] + [
+                self.schmetzer_scores_tables["season"].replace("YEAR", str(year))
+                for year in self.get_schmetzer_season_tables(c)]
             for t in tables:
                 self._upsert_table_to_supabase(supabase, c, t, self.SUPABASE_SCORE_COLUMNS,
                                                on_conflict='id', scored_rows_only=True)

@@ -28,7 +28,6 @@ INSERT INTO schmetzer_scores_all (
     base_salary,
     guaranteed_comp,
     salary_match_tier,
-    schmetzer_score_per_million,
     schmetzer_value_rk
 )
 SELECT
@@ -59,6 +58,5 @@ SELECT
     base_salary,
     guaranteed_comp,
     salary_match_tier,
-    schmetzer_score_per_million,
     schmetzer_value_rk
 FROM schmetzer_scores_{year};

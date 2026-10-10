@@ -23,7 +23,6 @@ SET squad = (
                 WHERE crosswalk.club_alias = "{table}".squad
                   AND crosswalk.source = 'fbref'
             ), 'unknown_squad'), ' ', ''))
-         || '-' || LOWER(REPLACE(COALESCE(player_nationality, 'unknown_nat'), ' ', ''))
 WHERE EXISTS (
     SELECT 1
     FROM dim_mls_club_crosswalk crosswalk

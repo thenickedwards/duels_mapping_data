@@ -29,7 +29,6 @@ CREATE TABLE "schmetzer_scores_{year}" (
     base_salary                 REAL, -- MLSPA annual base salary in USD
     guaranteed_comp             REAL, -- MLSPA annual average guaranteed compensation in USD
     salary_match_tier           TEXT, -- Which rule joined this player to their salary record
-    schmetzer_score_per_million REAL, -- Schmetzer Score earned per $1M of guaranteed compensation
     schmetzer_value_rk          INTEGER,
     load_datetime           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     -- , UNIQUE(player_name, player_yob, season, squad)
@@ -73,7 +72,7 @@ WITH ranked_squads AS (
                PARTITION BY player_name, player_yob
                ORDER BY nineties DESC
            ) AS squad_rank
-    FROM stg_FBref_mls_players_all_stats_misc
+    FROM stg_mls_players_all_stats_misc -- FBref through 2025, WhoScored from 2026
     WHERE season = {year}
 ),
 squad_agg_by_nineties AS (
@@ -98,8 +97,9 @@ squad_agg_by_nineties AS (
 -- 
 SELECT
     -- Construct id manually with SQLite syntax
-    LOWER(REPLACE(player_name, ' ', '')) || '-' || player_yob || '-' || season || '-' || LOWER(REPLACE(COALESCE(squad, 'unknown_squad'), ' ', '')) || '-' || LOWER(REPLACE(COALESCE(player_nationality, 'unknown_nat'), ' ', '')) AS id,
-    -- LOWER(REPLACE(player_name, ' ', '')) || '-' || player_yob || '-' || season || '-' || LOWER(REPLACE(squad, ' ', '')) AS id, -- v1
+    -- name-birthyear-season-squad: no two players share a name and birth year at one
+    -- club in one season. Nationality was dropped from the id in October 2026.
+    LOWER(REPLACE(player_name, ' ', '')) || '-' || COALESCE(player_yob, 'unknown_yob') || '-' || season || '-' || LOWER(REPLACE(COALESCE(squad, 'unknown_squad'), ' ', '')) AS id,
     season,
     player_name,
     player_nationality,
