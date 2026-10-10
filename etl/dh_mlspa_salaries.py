@@ -12,7 +12,6 @@ SALARY_COLUMNS = [
     ('base_salary', 'REAL'),
     ('guaranteed_comp', 'REAL'),
     ('salary_match_tier', 'TEXT'),
-    ('schmetzer_score_per_million', 'REAL'),
     ('schmetzer_value_rk', 'INTEGER'),
 ]
 
@@ -83,33 +82,32 @@ class DH_MLSPA(DataHandler):
         finally:
             conn.close()
 
-    ##### Extract, transform, load #####
+    def drop_retired_salary_columns(self):
+        """ Drop schmetzer_score_per_million from Schmetzer Score tables that still have it.
 
-    def insert_dim_mls_club_crosswalk(self):
-        """ Load both sources' club spellings into the crosswalk.
-
-        The FBref aliases live here rather than with the FBref pipeline because there is
-        one crosswalk table and one canonical set of squad names; both feeds resolve
-        against it so a club reads identically wherever it came from.
+        The per-dollar figure is derived in the app from the score and salary columns,
+        so it is no longer stored (October 2026). The season tables lose it whenever they
+        are rescored; this clears it from schmetzer_scores_all, which is never rebuilt.
+        Idempotent.
         """
         conn = self.connect()
         c = conn.cursor()
         try:
-            c.execute(f"DELETE FROM {self.club_crosswalk_table}")
-            for source, aliases in (('fbref', self.fbref_squad_aliases),
-                                    ('mlspa', self.mlspa_club_aliases)):
-                for club_alias, squad in aliases.items():
-                    c.execute(
-                        f"INSERT OR REPLACE INTO {self.club_crosswalk_table} "
-                        f"VALUES (:club_alias, :source, :squad)",
-                        {'club_alias': club_alias, 'source': source, 'squad': squad})
-                print(f'Inserted into table: {self.club_crosswalk_table} '
-                      f'{len(aliases)} {source} club spellings')
+            c.execute('DROP INDEX IF EXISTS idx_schmetzer_scores_all__value')
+            tables = [self.schmetzer_scores_tables["all"]] + [
+                f'schmetzer_scores_{season}' for season in self.get_schmetzer_season_tables(c)]
+            for table in tables:
+                c.execute(f'PRAGMA table_info("{table}")')
+                if 'schmetzer_score_per_million' in {row[1] for row in c.fetchall()}:
+                    c.execute(f'ALTER TABLE "{table}" DROP COLUMN schmetzer_score_per_million')
+                    print(f'Dropped column: {table}.schmetzer_score_per_million')
             conn.commit()
         except sqlite3.Error as e:
             print(e)
         finally:
             conn.close()
+
+    ##### Extract, transform, load #####
 
     def _insert_raw_MLSPA_salaries_for_season(self, conn, cursor, season):
         """ Take in a connection, cursor and season, source that season's release into the raw table. """
@@ -222,7 +220,6 @@ class DH_MLSPA(DataHandler):
                 c.executescript(sql_template.format(
                     year=season,
                     salary_basis=self.salary["value_metric_basis"],
-                    value_per_dollars=self.salary["value_per_dollars"],
                     min_nineties=self.salary["min_nineties_for_value_rank"],
                 ))
                 print(f'Updated table: schmetzer_scores_{season} with salaries and value metric')

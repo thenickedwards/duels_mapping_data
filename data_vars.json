@@ -5,8 +5,13 @@
     "inaugural_season": 1996,
     "misc_raw_table": "raw_FBref_mls_players_all_stats_misc",
     "misc_stg_table": "stg_FBref_mls_players_all_stats_misc",
+    "misc_stg_view": "stg_mls_players_all_stats_misc",
     "salary_raw_table": "raw_MLSPA_mls_players_salaries",
     "salary_stg_table": "stg_MLSPA_mls_players_salaries",
+    "whoscored_raw_table": "raw_WhoScored_mls_players_match_stats",
+    "whoscored_profiles_table": "raw_WhoScored_mls_players_profiles",
+    "whoscored_players_table": "dim_WhoScored_mls_players",
+    "whoscored_stg_table": "stg_WhoScored_mls_players_all_stats_misc",
     "club_crosswalk_table": "dim_mls_club_crosswalk",
     "schmetzer_points_table": "dim_schmetzer_score_points",
     "schmetzer_scores_tables": {
@@ -22,7 +27,6 @@
   },
   "salary": {
     "value_metric_basis": "guaranteed_comp",
-    "value_per_dollars": 1000000,
     "min_nineties_for_value_rank": 5
   },
   "schmetzer_score_points": {
