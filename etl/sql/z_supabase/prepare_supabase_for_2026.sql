@@ -1,6 +1,6 @@
 -- Readies the Supabase copies of the Schmetzer Score tables for the October 2026 changes.
 -- Run this in the Supabase SQL editor, then run the sync:
---     source ./duels_mapping.sh sync
+--     source ./start-duels_mapping.sh sync
 --
 -- 1. schmetzer_scores_2026 is new. The sync upserts into tables that already exist, so it
 --    is created here with the 2025 table's shape and the same read-only policy as the rest

@@ -9,7 +9,7 @@
 --
 -- The SQLite database is the source of truth for these tables (see the README), so
 -- everything deleted here comes straight back on the next sync:
---     source ./duels_mapping.sh sync
+--     source ./start-duels_mapping.sh sync
 --
 -- Run this in the Supabase SQL editor, then run the sync.
 
