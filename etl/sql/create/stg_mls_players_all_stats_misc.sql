@@ -5,11 +5,15 @@ DROP VIEW IF EXISTS stg_mls_players_all_stats_misc;
 -- WhoScored covers 2026 onward. The Schmetzer Score scripts read this view, so a
 -- season scores the same way whichever source it came from.
 --
+-- stage is 'Regular Season' or 'Playoffs'. FBref's season tables were the regular season
+-- only, so its rows are all 'Regular Season'; the Schmetzer Score reads only those.
+--
 -- FBref takes precedence: a WhoScored season is only read where FBref has none, so
 -- loading WhoScored for an FBref season (to compare them, say) never double counts.
 CREATE VIEW stg_mls_players_all_stats_misc AS
 SELECT
-    season, player_name, player_nationality, position, squad, player_age, player_yob,
+    season, 'Regular Season' AS stage, player_name, player_nationality, position, squad,
+    player_age, player_yob,
     nineties, yellow_cards1, red_cards, yellow_cards2, fouls_committed, fouls_drawn,
     offside, crosses, interceptions, tackles_won, pks_won, pks_con, own_goals,
     recoveries, aerial_duels_won, aerial_duels_lost, aerial_duels_total,
@@ -17,7 +21,8 @@ SELECT
 FROM stg_FBref_mls_players_all_stats_misc
 UNION ALL
 SELECT
-    season, player_name, player_nationality, position, squad, player_age, player_yob,
+    season, stage, player_name, player_nationality, position, squad,
+    player_age, player_yob,
     nineties, yellow_cards1, red_cards, yellow_cards2, fouls_committed, fouls_drawn,
     offside, crosses, interceptions, tackles_won, pks_won, pks_con, own_goals,
     recoveries, aerial_duels_won, aerial_duels_lost, aerial_duels_total,

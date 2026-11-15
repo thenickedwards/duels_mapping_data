@@ -73,7 +73,9 @@ WITH ranked_squads AS (
                ORDER BY nineties DESC
            ) AS squad_rank
     FROM stg_mls_players_all_stats_misc -- FBref through 2025, WhoScored from 2026
-    WHERE season = {year}
+    -- Regular season only, as FBref's season tables were (no player there ever exceeds
+    -- 34.0 nineties), so every player is scored over the same schedule
+    WHERE season = {year} AND stage = 'Regular Season'
 ),
 squad_agg_by_nineties AS (
     SELECT
