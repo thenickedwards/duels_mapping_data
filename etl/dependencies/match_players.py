@@ -66,7 +66,7 @@ def _best_fuzzy(normalized_name, candidates):
 
 def match_players_to_salaries(players, salaries, verbose=1):
     '''
-    This function accepts a list of player dicts (id, player_name, squad) and a list of
+    This function accepts a list of player dicts (id, player_name, squad, optional alt_name) and a list of
     salary dicts (a stable 'key', player name parts and crosswalked 'squad'), matches
     each player to at most one salary row, and returns a dict of
     player id -> {'salary_key': ..., 'match_tier': ...} alongside a tier tally.
@@ -86,10 +86,13 @@ def match_players_to_salaries(players, salaries, verbose=1):
     remaining = []
     for player in players:
         normalized = normalize_player_name(player['player_name'])
+        # Another source's spelling of the same player, tried by the exact-name tiers only
+        alt_name = normalize_player_name(player.get('alt_name'))
         remaining.append({
             'id': player['id'],
             'squad': player.get('squad'),
             'normalized_name': normalized,
+            'exact_names': {normalized, alt_name} - {''},
             'tokens': name_tokens(normalized),
         })
 
@@ -101,11 +104,12 @@ def match_players_to_salaries(players, salaries, verbose=1):
         still_unmatched = []
         for player in remaining:
             squad_pool = [s for s in by_squad.get(player['squad'], []) if s['key'] not in claimed]
-            name_pool = [s for s in by_name.get(player['normalized_name'], []) if s['key'] not in claimed]
+            name_pool = [s for name in player['exact_names'] for s in by_name.get(name, [])
+                         if s['key'] not in claimed]
             tokens = set(player['tokens'])
 
             if tier == 'exact_name_club':
-                match = _unique([s for s in squad_pool if s['normalized_name'] == player['normalized_name']])
+                match = _unique([s for s in squad_pool if s['normalized_name'] in player['exact_names']])
             elif tier == 'exact_name':
                 match = _unique(name_pool)
             elif tier == 'token_subset_club':

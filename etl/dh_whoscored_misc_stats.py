@@ -49,6 +49,10 @@ class DH_WhoScored(DataHandler):
             self.whoscored_cache_dir = whoscored["cache_dir"]
             self.whoscored_headless = whoscored["headless"]
             self.nationality_iso_to_fifa = whoscored["nationality_iso_to_fifa"]
+            # Players WhoScored names too differently for either matching rule to find
+            # ('Jay Fortune' is FBref's 'Ajani Fortune'), keyed by WhoScored player id
+            self.player_name_crosswalk = {
+                entry["player_id"]: entry for entry in whoscored.get("player_name_crosswalk", [])}
 
         with open(data_vars_path, 'r') as f:
             database = json.load(f)["database"]
@@ -200,6 +204,23 @@ class DH_WhoScored(DataHandler):
                     matches.append(candidate)
         return matches[0] if len(matches) == 1 else None
 
+    def _match_fbref_by_crosswalk(self, fbref_by_name, player_id):
+        """ Take in a WhoScored player id, return the FBref identity the crosswalk names for it, or None.
+
+        The crosswalk in dv_whoscored.json gives FBref's exact name and birth year, so the
+        lookup cannot drift onto a namesake. An entry naming no FBref player is reported
+        rather than silently ignored.
+        """
+        entry = self.player_name_crosswalk.get(player_id)
+        if not entry:
+            return None
+        for candidate in fbref_by_name.get(self._name_key(entry['player_name']), []):
+            if candidate['player_name'] == entry['player_name'] and candidate['player_yob'] == entry['player_yob']:
+                return candidate
+        print(f"  ⚠️  player_name_crosswalk maps {entry['whoscored_name']} ({player_id}) to "
+              f"{entry['player_name']} ({entry['player_yob']}), who is not in {self.stg_table}")
+        return None
+
     @staticmethod
     def _identity(fbref):
         """ Take in an FBref candidate, return just the fields dim_WhoScored_mls_players stores. """
@@ -210,8 +231,10 @@ class DH_WhoScored(DataHandler):
 
         A player FBref already knew keeps FBref's name, nationality and birth year, so
         their history stays joined up in the app; anyone else is read from their
-        WhoScored profile page (one fetch per player, cached). Players already resolved
-        are skipped, so each run only does the newcomers. Pass fetch_profiles=False to
+        WhoScored profile page (one fetch per player, cached). A player listed in
+        player_name_crosswalk in dv_whoscored.json takes the FBref identity it names,
+        ahead of either name rule. Players already resolved are skipped, so each run
+        only does the newcomers -- and any player newly added to the crosswalk. Pass fetch_profiles=False to
         skip the profile fetches and leave newcomers with WhoScored's name alone; they
         stay unresolved (detail_source NULL) and are tried again on the next run.
         """
@@ -219,15 +242,21 @@ class DH_WhoScored(DataHandler):
         c = conn.cursor()
         try:
             fbref_by_name = self._get_fbref_identities(c)
+            # Crosswalked players are re-resolved until they carry the crosswalk's identity,
+            # so an entry added after a player was first resolved still takes effect
+            crosswalk_ids = list(self.player_name_crosswalk)
+            crosswalk_placeholders = ', '.join('?' for _ in crosswalk_ids) or 'NULL'
             for season in (seasons or self.get_whoscored_seasons()):
                 c.execute(f"""
                     SELECT raw.player_id, MAX(raw.player), MAX(raw.age), MAX(raw.load_datetime)
                     FROM {self.whoscored_raw_table} raw
                     WHERE raw.season = ?
                       AND raw.player_id NOT IN (SELECT player_id FROM {self.whoscored_players_table}
-                                                WHERE detail_source IS NOT NULL)
+                                                WHERE detail_source IS NOT NULL
+                                                  AND (detail_source = 'fbref_crosswalk'
+                                                       OR player_id NOT IN ({crosswalk_placeholders})))
                     GROUP BY raw.player_id
-                """, (season,))
+                """, (season, *crosswalk_ids))
                 newcomers = c.fetchall()
                 print(f'Resolving {len(newcomers)} new players for season {season}')
 
@@ -239,8 +268,18 @@ class DH_WhoScored(DataHandler):
                            'player_yob': None, 'birth_date': None, 'fbref_season': None,
                            'fbref_age': None, 'fallback_position': None, 'detail_source': None}
 
-                    fbref = self._match_fbref_by_name(fbref_by_name, whoscored_name, fetched_age, fetched_year)
-                    if fbref:
+                    crosswalked = self._match_fbref_by_crosswalk(fbref_by_name, player_id)
+                    fbref = crosswalked or self._match_fbref_by_name(
+                        fbref_by_name, whoscored_name, fetched_age, fetched_year)
+                    if crosswalked:
+                        # FBref's spelling and nationality, but a stored profile's exact
+                        # birth date (no fetch: the crosswalk already settles who this is)
+                        row.update(self._identity(crosswalked), detail_source='fbref_crosswalk')
+                        profile = self._get_stored_profile(c, player_id)
+                        row['birth_date'] = profile.get('birth_date')
+                        row['fallback_position'] = (self._profile_position(profile.get('positions'))
+                                                    or crosswalked['fallback_position'])
+                    elif fbref:
                         row.update(self._identity(fbref), detail_source='fbref_name')
                     elif fetch_profiles:
                         print(f'  [{i}/{len(newcomers)}] Sourcing profile for {whoscored_name} ({player_id})')
@@ -279,13 +318,18 @@ class DH_WhoScored(DataHandler):
         finally:
             conn.close()
 
-    def _get_profile(self, cursor, season, player_id):
-        """ Take in a cursor, season and player id, return their profile, fetching it once ever. """
+    def _get_stored_profile(self, cursor, player_id):
+        """ Take in a cursor and player id, return their profile if already fetched, else {}. """
         cursor.execute(f"SELECT player, nationality, nationality_iso, birth_date, positions "
                        f"FROM {self.whoscored_profiles_table} WHERE player_id = ?", (player_id,))
         stored = cursor.fetchone()
+        return dict(zip(('player', 'nationality', 'nationality_iso', 'birth_date', 'positions'), stored)) if stored else {}
+
+    def _get_profile(self, cursor, season, player_id):
+        """ Take in a cursor, season and player id, return their profile, fetching it once ever. """
+        stored = self._get_stored_profile(cursor, player_id)
         if stored:
-            return dict(zip(('player', 'nationality', 'nationality_iso', 'birth_date', 'positions'), stored))
+            return stored
         try:
             profile = get_WhoScored_player_profile(self.get_reader(season), player_id)
         except Exception as e:  # A missing profile should not stop the run
