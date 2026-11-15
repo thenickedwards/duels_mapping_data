@@ -8,6 +8,134 @@
   "first_season": 2026,
   "cache_dir": "~/soccerdata/data/WhoScored",
   "headless": true,
+  "player_name_crosswalk": [
+    {
+      "player_id": 131057,
+      "whoscored_name": "Ramiro",
+      "player_name": "Ramiro Benetti",
+      "player_yob": 1993
+    },
+    {
+      "player_id": 397860,
+      "whoscored_name": "Tah Brian Anunga",
+      "player_name": "Brian Anunga",
+      "player_yob": 1996
+    },
+    {
+      "player_id": 445100,
+      "whoscored_name": "Jay Fortune",
+      "player_name": "Ajani Fortune",
+      "player_yob": 2002
+    },
+    {
+      "player_id": 403223,
+      "whoscored_name": "Mahala Opoku",
+      "player_name": "Kwadwo Opoku",
+      "player_yob": 2001
+    },
+    {
+      "player_id": 469054,
+      "whoscored_name": "Emiro Garcés",
+      "player_name": "Carlos Garcés",
+      "player_yob": 2001
+    },
+    {
+      "player_id": 405634,
+      "whoscored_name": "Nicolás Fernández Mercau",
+      "player_name": "Nicolás Ezequiel Fernández",
+      "player_yob": 2000
+    },
+    {
+      "player_id": 341315,
+      "whoscored_name": "Shapi Suleymanov",
+      "player_name": "Magomed-Shapi Suleymanov",
+      "player_yob": 1999
+    },
+    {
+      "player_id": 403651,
+      "whoscored_name": "Ralph Priso",
+      "player_name": "Ralph Priso-Mbongue",
+      "player_yob": 2002
+    },
+    {
+      "player_id": 247429,
+      "whoscored_name": "Yeimar Gómez",
+      "player_name": "Yeimar Gómez Andrade",
+      "player_yob": 1992
+    },
+    {
+      "player_id": 402892,
+      "whoscored_name": "Iván Jaime",
+      "player_name": "Ivan Jaime Pajuelo",
+      "player_yob": 2000
+    },
+    {
+      "player_id": 378634,
+      "whoscored_name": "Calegari",
+      "player_name": "Lucas Calegari",
+      "player_yob": 2002
+    },
+    {
+      "player_id": 495545,
+      "whoscored_name": "Mateja Djordjevic",
+      "player_name": "Mateja Đorđević",
+      "player_yob": 2003
+    },
+    {
+      "player_id": 452267,
+      "whoscored_name": "J.C. Ngando",
+      "player_name": "Jean-Claude Ngando",
+      "player_yob": 1999
+    },
+    {
+      "player_id": 383126,
+      "whoscored_name": "Gabriel Pec",
+      "player_name": "Gabriel Chaves",
+      "player_yob": 2001
+    },
+    {
+      "player_id": 441421,
+      "whoscored_name": "Igor Jesus",
+      "player_name": "Igor",
+      "player_yob": 2003
+    },
+    {
+      "player_id": 557469,
+      "whoscored_name": "Djé D'Avilla",
+      "player_name": "Innocent Dje",
+      "player_yob": 2003
+    },
+    {
+      "player_id": 480493,
+      "whoscored_name": "Ibrahim Aliyu",
+      "player_name": "Aliyu Ibrahim",
+      "player_yob": 2002
+    },
+    {
+      "player_id": 283761,
+      "whoscored_name": "Saba Lobjanidze",
+      "player_name": "Saba Lobzhanidze",
+      "player_yob": 1994
+    },
+    {
+      "player_id": 372326,
+      "whoscored_name": "Dagur Thórhallsson",
+      "player_name": "Dagur Dan Þórhallsson",
+      "player_yob": 2000
+    },
+    {
+      "player_id": 371011,
+      "whoscored_name": "Sérgio Santos",
+      "player_name": "Sergio Santos Gomes",
+      "player_yob": 1994
+    },
+    {
+      "player_id": 383808,
+      "whoscored_name": "João Klauss",
+      "player_name": "Klauss",
+      "player_yob": 1997
+    }
+  ],
   "nationality_iso_to_fifa": {
     "ag": "ATG",
     "al": "ALB",

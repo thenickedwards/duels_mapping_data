@@ -44,6 +44,12 @@ class DH_MLSPA(DataHandler):
             self.mlspa = json.load(f)
         self.salary_releases = self.mlspa["salary_releases"]
 
+        # WhoScored's tables, to match its seasons' salaries on WhoScored's spelling too
+        with open(data_vars_path, 'r') as f:
+            database = json.load(f)["database"]
+            self.whoscored_players_table = database["whoscored_players_table"]
+            self.whoscored_stg_table = database["whoscored_stg_table"]
+
     def get_salary_seasons(self):
         """ Return the seasons dv_mlspa.json has an MLSPA release configured for. """
         return sorted(int(season) for season in self.salary_releases)
@@ -166,6 +172,29 @@ class DH_MLSPA(DataHandler):
         finally:
             conn.close()
 
+    def _get_players_to_match(self, cursor, season):
+        """ Take in a cursor and season, return that season's scored players to match salaries to.
+
+        A WhoScored season's player may be scored under the FBref-era name that
+        player_name_crosswalk in dv_whoscored.json gave them ('Nicolás Ezequiel Fernández')
+        while the MLSPA prints the name WhoScored uses ('Nicolás Fernández Mercau'), so
+        that spelling rides along as alt_name for the exact-name tiers to try too.
+        """
+        cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN (?, ?)",
+                       (self.whoscored_players_table, self.whoscored_stg_table))
+        if cursor.fetchone()[0] < 2:
+            alt_name = 'NULL'
+        else:
+            alt_name = f"""(SELECT MAX(dim.whoscored_name)
+                            FROM {self.whoscored_players_table} dim
+                            JOIN {self.whoscored_stg_table} ws
+                              ON ws.player_id = dim.player_id AND ws.season = {season}
+                            WHERE dim.player_name = scores.player_name
+                              AND dim.player_yob IS scores.player_yob
+                              AND dim.whoscored_name != dim.player_name)"""
+        return [dict(r) for r in cursor.execute(
+            f'SELECT id, player_name, squad, {alt_name} AS alt_name FROM "schmetzer_scores_{season}" scores')]
+
     def match_stg_MLSPA_mls_players_salaries(self, seasons=None):
         """ Resolve each season's salary rows to the players scored in schmetzer_scores_YYYY.
 
@@ -183,8 +212,7 @@ class DH_MLSPA(DataHandler):
                     print(f'Skipped matching salaries for season {season}: no schmetzer_scores_{season} table')
                     continue
 
-                players = [dict(r) for r in c.execute(
-                    f'SELECT id, player_name, squad FROM "schmetzer_scores_{season}"')]
+                players = self._get_players_to_match(c, season)
                 salaries = [dict(r) for r in c.execute(
                     f"SELECT salary_key AS key, player_first_name AS first_name, "
                     f"player_last_name AS last_name, squad "

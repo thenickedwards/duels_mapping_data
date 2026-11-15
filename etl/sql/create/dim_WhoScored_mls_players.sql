@@ -6,7 +6,9 @@ DROP TABLE IF EXISTS dim_WhoScored_mls_players;
 -- every Schmetzer Score id and is how the app links a player across seasons. So a
 -- player who appears in the FBref tables (2018-2025) carries over FBref's name,
 -- nationality and birth year, keeping their history joined up; anyone else is filled
--- from their WhoScored profile page. detail_source records which rule applied.
+-- from their WhoScored profile page. Players the two sources name too differently
+-- for the name rules ('Jay Fortune' / 'Ajani Fortune') are listed by player id in
+-- player_name_crosswalk in dv_whoscored.json. detail_source records which rule applied.
 CREATE TABLE dim_WhoScored_mls_players (
     player_id           INTEGER PRIMARY KEY, -- WhoScored's player id
     whoscored_name      TEXT NOT NULL,
@@ -17,6 +19,6 @@ CREATE TABLE dim_WhoScored_mls_players (
     fbref_season        INTEGER,             -- The FBref season carried over from, if any
     fbref_age           INTEGER,             -- FBref's age for that season, to age forward from
     fallback_position   TEXT,                -- GK/DF/MF/FW for players who never start
-    detail_source       TEXT,                -- 'fbref_name', 'fbref_profile', 'whoscored_profile' or NULL
+    detail_source       TEXT,                -- 'fbref_crosswalk', 'fbref_name', 'fbref_profile', 'whoscored_profile' or NULL
     load_datetime       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
