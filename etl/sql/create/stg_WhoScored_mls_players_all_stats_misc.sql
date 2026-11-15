@@ -1,10 +1,11 @@
 DROP TABLE IF EXISTS stg_WhoScored_mls_players_all_stats_misc;
 
--- The WhoScored match rows summed to one row per player per squad per season, in the
--- same shape as stg_FBref_mls_players_all_stats_misc so the two can be read as one
--- (see stg_mls_players_all_stats_misc). player_id is the only addition.
+-- The WhoScored match rows summed to one row per player per squad per stage per season,
+-- in the same shape as stg_FBref_mls_players_all_stats_misc so the two can be read as
+-- one (see stg_mls_players_all_stats_misc). player_id and stage are the additions.
 CREATE TABLE stg_WhoScored_mls_players_all_stats_misc (
     season                  INTEGER  NOT NULL,
+    stage                   TEXT     NOT NULL DEFAULT 'Regular Season', -- or 'Playoffs'
     player_id               INTEGER  NOT NULL, -- WhoScored's player id
     player_name             TEXT     NOT NULL,
     player_nationality      TEXT,

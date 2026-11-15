@@ -1,10 +1,13 @@
 -- Rebuilds one season of stg_WhoScored_mls_players_all_stats_misc from the match rows.
 -- {year} is filled in by DH_WhoScored. A season is replaced whole on every run, unlike
 -- the FBref load, so totals keep up as matches are added through the season.
+-- Each stage is summed apart ('Regular Season' or 'Playoffs'), so the playoffs are kept
+-- here for any postseason view while the Schmetzer Score reads the regular season only.
 DELETE FROM stg_WhoScored_mls_players_all_stats_misc WHERE season = {year};
 
 INSERT INTO stg_WhoScored_mls_players_all_stats_misc (
     season,
+    stage,
     player_id,
     player_name,
     player_nationality,
@@ -35,8 +38,16 @@ INSERT INTO stg_WhoScored_mls_players_all_stats_misc (
 -- WhoScored records a starter's position per match; FBref recorded a season position
 -- as GK/DF/MF/FW, adding a second when the player spent real time there ('MF,FW').
 -- Each match code is folded into one of those four, as in get_from_whoscored.py.
-WITH starts AS (
+WITH stage_rows AS (
+    -- WhoScored names its stages 'Major League Soccer' and 'Major League Soccer Playoff'
+    SELECT *,
+           CASE WHEN stage LIKE '%Playoff%' THEN 'Playoffs' ELSE 'Regular Season' END AS season_stage
+    FROM raw_WhoScored_mls_players_match_stats
+    WHERE season = {year}
+),
+starts AS (
     SELECT
+        season_stage,
         player_id,
         team,
         CASE
@@ -45,40 +56,42 @@ WITH starts AS (
             WHEN position IN ('DMC', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR') THEN 'MF'
             WHEN position IN ('FW', 'FWL', 'FWR') THEN 'FW'
         END AS position_group
-    FROM raw_WhoScored_mls_players_match_stats
-    WHERE season = {year} AND is_starter = 1
+    FROM stage_rows
+    WHERE is_starter = 1
 ),
 position_counts AS (
     SELECT
+        season_stage,
         player_id,
         team,
         position_group,
         COUNT(*) AS starts,
-        ROW_NUMBER() OVER (PARTITION BY player_id, team ORDER BY COUNT(*) DESC, position_group) AS position_rank,
-        SUM(COUNT(*)) OVER (PARTITION BY player_id, team) AS total_starts
+        ROW_NUMBER() OVER (PARTITION BY season_stage, player_id, team ORDER BY COUNT(*) DESC, position_group) AS position_rank,
+        SUM(COUNT(*)) OVER (PARTITION BY season_stage, player_id, team) AS total_starts
     FROM starts
     WHERE position_group IS NOT NULL
-    GROUP BY player_id, team, position_group
+    GROUP BY season_stage, player_id, team, position_group
 ),
 positions AS (
     -- A second position is listed when it accounts for at least a quarter of the starts
     SELECT
+        season_stage,
         player_id,
         team,
         MAX(CASE WHEN position_rank = 1 THEN position_group END)
             || COALESCE(',' || MAX(CASE WHEN position_rank = 2 AND starts * 4 >= total_starts
                                         THEN position_group END), '') AS position
     FROM position_counts
-    GROUP BY player_id, team
+    GROUP BY season_stage, player_id, team
 ),
 season_start AS (
     -- FBref gave each player's age at the start of the season
     SELECT MIN(game_date) AS game_date
-    FROM raw_WhoScored_mls_players_match_stats
-    WHERE season = {year}
+    FROM stage_rows
 ),
 totals AS (
     SELECT
+        raw.season_stage,
         raw.player_id,
         raw.team,
         MAX(raw.player) AS whoscored_name,
@@ -99,12 +112,12 @@ totals AS (
         SUM(raw.recov) AS recov,
         SUM(raw.duels_won) AS duels_won,
         SUM(raw.duels_lost) AS duels_lost
-    FROM raw_WhoScored_mls_players_match_stats raw
-    WHERE raw.season = {year}
-    GROUP BY raw.player_id, raw.team
+    FROM stage_rows raw
+    GROUP BY raw.season_stage, raw.player_id, raw.team
 )
 SELECT
     {year},
+    totals.season_stage,
     totals.player_id,
     COALESCE(players.player_name, totals.whoscored_name),
     players.player_nationality,
@@ -151,7 +164,8 @@ CROSS JOIN season_start
 LEFT JOIN dim_WhoScored_mls_players players
        ON players.player_id = totals.player_id
 LEFT JOIN positions
-       ON positions.player_id = totals.player_id
+       ON positions.season_stage = totals.season_stage
+      AND positions.player_id = totals.player_id
       AND positions.team = totals.team
 LEFT JOIN dim_mls_club_crosswalk crosswalk
        ON crosswalk.club_alias = totals.team

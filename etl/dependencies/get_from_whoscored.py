@@ -73,13 +73,13 @@ def get_WhoScored_reader(league, season, cache_dir, headless=True):
                                 data_dir=cache_dir, headless=headless)
 
 
-def get_WhoScored_mls_schedule(reader, regular_season_only=True, verbose=1):
+def get_WhoScored_mls_schedule(reader, verbose=1):
     '''
     This function accepts a WhoScored reader and returns its season's finished games as a
     DataFrame of game_id, game_date and stage.
 
-    FBref's season tables counted the regular season only (no player there ever exceeds
-    34.0 nineties), so the playoffs are dropped by default to keep seasons comparable.
+    Every stage is kept, playoffs included, and staging sums each stage apart. The
+    Schmetzer Score reads the regular season only (see schmetzer_scores_players.sql).
     '''
     schedule = reader.read_schedule().reset_index()
     # status 6 is a finished game; anything else has no complete event stream yet
@@ -87,8 +87,6 @@ def get_WhoScored_mls_schedule(reader, regular_season_only=True, verbose=1):
     # The stage is blank until a season has more than one, so a missing stage is the
     # regular season
     games['stage'] = games['stage'].fillna('Major League Soccer')
-    if regular_season_only:
-        games = games[~games['stage'].str.contains('Playoff', case=False)]
     games['game_date'] = games['date'].astype(str).str[:10]
     if verbose >= 1:
         print(f'Found {len(games)} finished games of {len(schedule)} scheduled')

@@ -6,7 +6,6 @@
     "season_end": "Dec"
   },
   "first_season": 2026,
-  "regular_season_only": true,
   "cache_dir": "~/soccerdata/data/WhoScored",
   "headless": true,
   "nationality_iso_to_fifa": {

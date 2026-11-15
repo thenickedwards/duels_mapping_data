@@ -23,8 +23,9 @@ class DH_WhoScored(DataHandler):
     raw_WhoScored_mls_players_match_stats as one row per player; players are resolved to
     the identity the app already knows them by in dim_WhoScored_mls_players; and each
     season is summed into stg_WhoScored_mls_players_all_stats_misc, which has the FBref
-    staging table's shape. The Schmetzer Score scripts read both through the
-    stg_mls_players_all_stats_misc view.
+    staging table's shape plus a stage, so the playoffs are kept apart from the regular
+    season. The Schmetzer Score scripts read both through the
+    stg_mls_players_all_stats_misc view, regular season only.
 
     Run by hand only. Every page fetched is cached (see cache_dir in dv_whoscored.json),
     so a re-run fetches only matches played since the last one.
@@ -45,7 +46,6 @@ class DH_WhoScored(DataHandler):
             whoscored = json.load(f)
             self.whoscored_league = whoscored["league"]
             self.whoscored_first_season = whoscored["first_season"]
-            self.whoscored_regular_season_only = whoscored["regular_season_only"]
             self.whoscored_cache_dir = whoscored["cache_dir"]
             self.whoscored_headless = whoscored["headless"]
             self.nationality_iso_to_fifa = whoscored["nationality_iso_to_fifa"]
@@ -98,7 +98,7 @@ class DH_WhoScored(DataHandler):
     def _insert_raw_WhoScored_for_season(self, conn, cursor, season):
         """ Take in a connection, cursor and season, source that season's finished matches into the raw table. """
         reader = self.get_reader(season)
-        games = get_WhoScored_mls_schedule(reader, regular_season_only=self.whoscored_regular_season_only)
+        games = get_WhoScored_mls_schedule(reader)
         df = get_WhoScored_mls_player_match_stats(reader, self.whoscored_league["key"], games)
         # Once new data obtained, remove existing data, then insert
         cursor.execute(f"DELETE FROM {self.whoscored_raw_table} WHERE season = ?", (season,))
@@ -336,10 +336,11 @@ class DH_WhoScored(DataHandler):
         try:
             canonical = set(self.mls_squad_names)
             for season in (seasons or self.get_whoscored_seasons()):
-                c.execute(f"SELECT COUNT(*), COUNT(player_nationality), COUNT(player_yob) "
-                          f"FROM {self.whoscored_stg_table} WHERE season = ?", (season,))
-                total, nationality, yob = c.fetchone()
-                print(f'  {season}: {total} rows, {nationality} with nationality, {yob} with birth year')
+                c.execute(f"SELECT stage, COUNT(*), COUNT(player_nationality), COUNT(player_yob) "
+                          f"FROM {self.whoscored_stg_table} WHERE season = ? "
+                          f"GROUP BY stage ORDER BY stage DESC", (season,))
+                for stage, total, nationality, yob in c.fetchall():
+                    print(f'  {season} {stage}: {total} rows, {nationality} with nationality, {yob} with birth year')
                 c.execute(f"SELECT DISTINCT squad FROM {self.whoscored_stg_table} WHERE season = ?", (season,))
                 unknown = sorted(s for (s,) in c.fetchall() if s not in canonical)
                 if unknown:
